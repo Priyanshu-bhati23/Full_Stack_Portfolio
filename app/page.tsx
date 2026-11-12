@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Hero from "@/components/Hero";
+import Tilt from "@/components/Tilt";
 import { profile, projects } from "@/data/profile";
 
 export default function Home() {
@@ -29,6 +30,9 @@ export default function Home() {
 
       <main id="top">
         <section className="hero">
+          <div className="hero-scene">
+            <Hero />
+          </div>
           <div className="hero-copy">
             <p className="hero-role">
               {profile.role}
@@ -47,10 +51,7 @@ export default function Home() {
               )}
             </div>
           </div>
-          <div className="hero-scene">
-            <Hero />
-            <p className="hero-hint">Each object is a project. Select one to jump to it.</p>
-          </div>
+          <p className="hero-hint">Move over the portrait, select it, or pick one of the three objects circling it.</p>
         </section>
 
         <section id="work" aria-label="Work">
@@ -86,9 +87,9 @@ export default function Home() {
                     </div>
                   )}
                 </div>
-                <div className="panel-shot">
+                <Tilt className="panel-shot">
                   <Image src={project.shot} alt={project.shotAlt} width={2400} height={1500} sizes="(max-width: 1000px) 100vw, 62vw" />
-                </div>
+                </Tilt>
               </div>
             </article>
           ))}
@@ -100,6 +101,19 @@ export default function Home() {
             {profile.about.map((paragraph) => (
               <p key={paragraph}>{paragraph}</p>
             ))}
+            {profile.earlier.length > 0 && (
+              <div className="earlier">
+                <h3>Earlier projects</h3>
+                {profile.earlier.map((item) => (
+                  <p key={item.name}>
+                    <a href={item.link} target="_blank" rel="noreferrer">
+                      {item.name}
+                    </a>
+                    {item.what}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
           <dl className="skills">
             {profile.skills.map((skill) => (
@@ -115,7 +129,7 @@ export default function Home() {
           <section className="history">
             {profile.experience.length > 0 && (
               <div>
-                <h2>Experience</h2>
+                <h2>{profile.experienceTitle}</h2>
                 {profile.experience.map((job) => (
                   <div className="entry" key={job.role + job.org}>
                     <p className="entry-period">{job.period}</p>
@@ -123,11 +137,13 @@ export default function Home() {
                       <h3>
                         {job.role}, {job.org}
                       </h3>
-                      <ul>
-                        {job.points.map((point) => (
-                          <li key={point}>{point}</li>
-                        ))}
-                      </ul>
+                      {job.points.length > 0 && (
+                        <ul>
+                          {job.points.map((point) => (
+                            <li key={point}>{point}</li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   </div>
                 ))}

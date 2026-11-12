@@ -1,73 +1,32 @@
 "use client";
 
-import { Canvas, useFrame } from "@react-three/fiber";
-import { useMemo, useRef, useState, type RefObject } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import * as THREE from "three";
 
 /**
- * Three objects, one per project: an orbit model for Repoverse, a honeycomb
- * for Hivemind and a noise-displaced orb for VoxUI. Hover one to lift it,
- * select it to jump to its project.
+ * The hero scene.
+ *
+ * In the middle is a portrait built from tens of thousands of particles, one
+ * per sampled pixel of a photo, each pushed forward or back to give the face
+ * depth. The particles fly in on load, move away from the pointer, burst when
+ * the portrait is selected and drift apart as the page scrolls.
+ *
+ * Three objects orbit the portrait, one per project: an orbit model for
+ * Repoverse, a honeycomb for Hivemind and a noise-displaced orb for VoxUI.
+ * Hover one to stop the orbit, select it to jump to its project.
  */
 
 type Slug = "repoverse" | "hivemind" | "voxui";
 
-const PLACES: Record<Slug, [number, number, number]> = {
-  repoverse: [-1.5, 0.95, 0],
-  hivemind: [0.25, -1.05, 0.6],
-  voxui: [1.9, 1.0, -0.2],
-};
-
-/** How far below its centre each object's caption sits, in world units. */
-const DROPS: Record<Slug, number> = { repoverse: 1.6, hivemind: 1.2, voxui: 1.25 };
-
+const SLUGS: Slug[] = ["repoverse", "hivemind", "voxui"];
 const NAMES: Record<Slug, string> = { repoverse: "Repoverse", hivemind: "Hivemind", voxui: "VoxUI" };
+
+/** Portrait size in world units before fitting to the screen. */
+const PORTRAIT_WIDTH = 3.7;
 
 function goTo(slug: Slug) {
   document.getElementById(slug)?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-interface ObjectProps {
-  slug: Slug;
-  still: boolean;
-  hovered: Slug | null;
-  onHover: (slug: Slug | null) => void;
-  children: React.ReactNode;
-}
-
-/** Shared behaviour: float, lift on hover, select to navigate. */
-function Floating({ slug, still, hovered, onHover, children }: ObjectProps) {
-  const group = useRef<THREE.Group>(null);
-  const scale = useRef(1);
-  const [x, y, z] = PLACES[slug];
-  const phase = x * 1.7;
-
-  useFrame(({ clock }, dt) => {
-    if (!group.current) return;
-    const t = clock.elapsedTime;
-    group.current.position.y = y + (still ? 0 : Math.sin(t * 0.9 + phase) * 0.12);
-    const target = hovered === slug ? 1.14 : hovered ? 0.94 : 1;
-    scale.current += (target - scale.current) * (1 - Math.exp(-Math.min(dt, 0.05) * 10));
-    group.current.scale.setScalar(scale.current);
-  });
-
-  return (
-    <group
-      ref={group}
-      position={[x, y, z]}
-      onPointerOver={(e) => {
-        e.stopPropagation();
-        onHover(slug);
-      }}
-      onPointerOut={() => onHover(null)}
-      onClick={(e) => {
-        e.stopPropagation();
-        goTo(slug);
-      }}
-    >
-      {children}
-    </group>
-  );
 }
 
 function Orbits({ still }: { still: boolean }) {
@@ -211,49 +170,298 @@ void main(){
 }`;
 
 function Blob({ still }: { still: boolean }) {
+  const material = useRef<THREE.ShaderMaterial>(null);
   const uniforms = useMemo(() => ({ uTime: { value: 0 } }), []);
   useFrame((_, dt) => {
-    if (!still) uniforms.uTime.value += Math.min(dt, 0.05);
+    // The material holds its own copy of each uniform, so update that one.
+    if (!still && material.current) material.current.uniforms.uTime.value += Math.min(dt, 0.05);
   });
   return (
     <mesh>
       <icosahedronGeometry args={[0.92, 32]} />
-      <shaderMaterial vertexShader={VERTEX} fragmentShader={FRAGMENT} uniforms={uniforms} />
+      <shaderMaterial ref={material} vertexShader={VERTEX} fragmentShader={FRAGMENT} uniforms={uniforms} />
     </mesh>
   );
 }
 
-/** Keeps the DOM captions under their objects and turns the scene with the scroll. */
-function Stage({ still, labels, children }: { still: boolean; labels: RefObject<Record<Slug, HTMLElement | null>>; children: React.ReactNode }) {
-  const group = useRef<THREE.Group>(null);
-  const point = useMemo(() => new THREE.Vector3(), []);
-  useFrame(({ camera, size, pointer }, dt) => {
-    if (!group.current) return;
-    if (!still) {
-      const k = 1 - Math.exp(-Math.min(dt, 0.05) * 3);
-      const scroll = Math.min(window.scrollY / Math.max(window.innerHeight, 1), 1.2);
-      group.current.rotation.y += (pointer.x * 0.22 + scroll * 0.9 - group.current.rotation.y) * k;
-      group.current.rotation.x += (-pointer.y * 0.1 - group.current.rotation.x) * k;
-      group.current.updateMatrixWorld();
+interface Portrait {
+  geometry: THREE.BufferGeometry;
+  height: number;
+}
+
+/** Turn a cut-out photo into a cloud of coloured points with a little depth. */
+function usePortrait(src: string): Portrait | null {
+  const [portrait, setPortrait] = useState<Portrait | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const image = new Image();
+    image.onload = () => {
+      if (cancelled) return;
+      const { width: w, height: h } = image;
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return;
+      ctx.drawImage(image, 0, 0);
+      const pixels = ctx.getImageData(0, 0, w, h).data;
+
+      // Fewer points on small or low-powered screens.
+      const step = window.innerWidth < 700 ? 3 : 2;
+      const height = (PORTRAIT_WIDTH * h) / w;
+      const positions: number[] = [];
+      const colors: number[] = [];
+      const seeds: number[] = [];
+
+      for (let py = 0; py < h; py += step) {
+        for (let px = 0; px < w; px += step) {
+          const i = (py * w + px) * 4;
+          if (pixels[i + 3] < 110) continue;
+          const u = px / w;
+          const v = py / h;
+          // Thin the points out toward the bottom so the bust fades instead of ending in a line.
+          if (v > 0.78 && Math.random() < ((v - 0.78) / 0.22) * 0.9) continue;
+
+          const r = pixels[i] / 255;
+          const g = pixels[i + 1] / 255;
+          const b = pixels[i + 2] / 255;
+          const light = (r + g + b) / 3;
+
+          // Depth is estimated, not measured: a dome for the head, a wider one for
+          // the shoulders, and brighter pixels a touch closer.
+          const hx = (u - 0.44) / 0.3;
+          const hy = (v - 0.32) / 0.34;
+          const head = Math.sqrt(Math.max(0, 1 - hx * hx - hy * hy));
+          const bx = (u - 0.5) / 0.62;
+          const by = (v - 1) / 0.5;
+          const body = Math.sqrt(Math.max(0, 1 - bx * bx - by * by));
+          const depth = head * 0.8 + body * 0.45 + (light - 0.4) * 0.25;
+
+          positions.push((u - 0.5) * PORTRAIT_WIDTH, (0.5 - v) * height, depth);
+          colors.push(r, g, b);
+          seeds.push(Math.random(), Math.random(), Math.random(), Math.random());
+        }
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute("aColor", new THREE.Float32BufferAttribute(colors, 3));
+      geometry.setAttribute("aSeed", new THREE.Float32BufferAttribute(seeds, 4));
+      geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 30);
+      setPortrait({ geometry, height });
+    };
+    image.src = src;
+    return () => {
+      cancelled = true;
+    };
+  }, [src]);
+
+  return portrait;
+}
+
+const POINT_VERTEX = /* glsl */ `
+attribute vec3 aColor;
+attribute vec4 aSeed;
+uniform float uTime;
+uniform float uAssemble;
+uniform float uScatter;
+uniform float uBurst;
+uniform float uSize;
+uniform float uScale;
+uniform vec3 uPointer;
+uniform float uPush;
+varying vec3 vColor;
+void main(){
+  // Fly in from a random cloud, each point with its own delay.
+  vec3 start = (aSeed.xyz - 0.5) * vec3(11.0, 8.0, 6.0);
+  float k = clamp((uAssemble - aSeed.w * 0.45) / 0.55, 0.0, 1.0);
+  k = k * k * (3.0 - 2.0 * k);
+  vec3 p = mix(start, position, k);
+
+  // A slow shimmer keeps the portrait alive.
+  p += 0.014 * vec3(sin(uTime * 1.3 + aSeed.x * 40.0), cos(uTime * 1.1 + aSeed.y * 40.0), sin(uTime * 0.9 + aSeed.z * 40.0));
+
+  // Points move away from the pointer.
+  vec2 away = p.xy - uPointer.xy;
+  float near = (1.0 - smoothstep(0.0, 0.85, length(away))) * uPush;
+  p.xy += normalize(away + 0.0001) * near * 0.5;
+  p.z += near * 0.9 * (aSeed.z - 0.15);
+
+  // Scrolling, or selecting the portrait, sends them outward.
+  vec3 dir = normalize(aSeed.xyz - 0.5);
+  p += dir * (uScatter * 7.0 * (0.35 + aSeed.w) + uBurst * 2.6 * aSeed.w);
+
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  gl_Position = projectionMatrix * mv;
+  gl_PointSize = uSize * uScale / -mv.z * (1.0 + near * 0.8);
+  vColor = aColor;
+}`;
+
+const POINT_FRAGMENT = /* glsl */ `
+varying vec3 vColor;
+void main(){
+  if (length(gl_PointCoord - 0.5) > 0.5) discard;
+  gl_FragColor = vec4(vColor, 1.0);
+}`;
+
+interface SceneProps {
+  still: boolean;
+  hovered: Slug | null;
+  onHover: (slug: Slug | null) => void;
+  labels: RefObject<Record<Slug, HTMLElement | null>>;
+}
+
+function Scene({ still, hovered, onHover, labels }: SceneProps) {
+  const portrait = usePortrait("/me.png");
+  const { viewport, size, camera } = useThree();
+  const figure = useRef<THREE.Group>(null);
+  const objects = useRef<Record<Slug, THREE.Group | null>>({ repoverse: null, hivemind: null, voxui: null });
+  const scales = useRef<Record<Slug, number>>({ repoverse: 1, hivemind: 1, voxui: 1 });
+  const orbit = useRef({ angle: 0.6, speed: 1 });
+  const burst = useRef(0);
+  const assemble = useRef(still ? 1 : 0);
+  const material = useRef<THREE.ShaderMaterial>(null);
+
+  const uniforms = useMemo(
+    () => ({
+      uTime: { value: 0 },
+      uAssemble: { value: 0 },
+      uScatter: { value: 0 },
+      uBurst: { value: 0 },
+      uSize: { value: 0.03 },
+      uScale: { value: 1 },
+      uPointer: { value: new THREE.Vector3(99, 99, 0) },
+      uPush: { value: 0 },
+    }),
+    [],
+  );
+
+  const scratch = useMemo(
+    () => ({ ray: new THREE.Raycaster(), plane: new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), hit: new THREE.Vector3(), point: new THREE.Vector3() }),
+    [],
+  );
+
+  // Fit the portrait to the canvas: beside the text on wide screens, centred on narrow ones.
+  const wide = size.width >= 900;
+  const height = portrait?.height ?? 4.4;
+  const fit = Math.min(1.15, (viewport.height * 0.84) / height, wide ? 9 : (viewport.width * 0.92) / PORTRAIT_WIDTH);
+  const centerX = wide ? viewport.width * 0.235 : 0;
+  const centerY = -viewport.height / 2 + (height * fit) / 2 - 0.05;
+
+  useFrame((state, dt) => {
+    // Write to the material's own uniforms: the renderer keeps its own copy of each one,
+    // so changing the object passed in as a prop would not reach the shader.
+    const u = material.current?.uniforms ?? uniforms;
+    const step = Math.min(dt, 0.05);
+    const ease = (rate: number) => 1 - Math.exp(-step * rate);
+    const scroll = Math.min(window.scrollY / Math.max(window.innerHeight, 1), 1);
+
+    if (!still) u.uTime.value += step;
+    // Real elapsed time, so the fly-in takes about two seconds even when frames are slow.
+    assemble.current = still ? 1 : Math.min(1, assemble.current + Math.min(dt, 0.3) / 2.2);
+    u.uAssemble.value = portrait ? assemble.current : 0;
+    if (!portrait) assemble.current = still ? 1 : 0;
+    u.uScatter.value += ((still ? 0 : scroll) - u.uScatter.value) * ease(4);
+    burst.current *= Math.exp(-step * 2.2);
+    u.uBurst.value = burst.current;
+    u.uScale.value = (size.height * state.viewport.dpr) / (2 * Math.tan(THREE.MathUtils.degToRad(21)));
+    u.uSize.value = (window.innerWidth < 700 ? 0.046 : 0.031) * fit;
+
+    if (figure.current) {
+      // The portrait turns a little toward the pointer.
+      if (!still) {
+        figure.current.rotation.y += (state.pointer.x * 0.32 - figure.current.rotation.y) * ease(3);
+        figure.current.rotation.x += (-state.pointer.y * 0.14 - figure.current.rotation.x) * ease(3);
+      }
+      figure.current.updateMatrixWorld();
+
+      // Where the pointer meets the portrait's plane, in the portrait's own space.
+      scratch.ray.setFromCamera(state.pointer, camera);
+      scratch.plane.constant = -0.4;
+      if (scratch.ray.ray.intersectPlane(scratch.plane, scratch.hit)) {
+        u.uPointer.value.copy(figure.current.worldToLocal(scratch.hit));
+      }
+      const inside = Math.abs(state.pointer.x) < 0.999 && Math.abs(state.pointer.y) < 0.999 && (state.pointer.x !== 0 || state.pointer.y !== 0);
+      u.uPush.value += ((still || !inside ? 0 : 1) - u.uPush.value) * ease(6);
     }
-    // On narrow screens pull the objects closer together so all three fit.
-    const fit = Math.min(1, size.width / 620);
-    group.current.scale.setScalar(0.62 + 0.38 * fit);
-    (Object.keys(PLACES) as Slug[]).forEach((slug) => {
-      const el = labels.current[slug];
-      if (!el) return;
-      const [x, y, z] = PLACES[slug];
-      point.set(x, y - DROPS[slug], z).applyMatrix4(group.current!.matrixWorld).project(camera);
-      el.style.transform = `translate(${((point.x * 0.5 + 0.5) * size.width).toFixed(1)}px, ${((-point.y * 0.5 + 0.5) * size.height).toFixed(1)}px) translate(-50%, 0)`;
+
+    // The three project objects circle the portrait, passing in front of it and behind it.
+    orbit.current.speed += ((hovered || still ? 0 : 1) - orbit.current.speed) * ease(5);
+    orbit.current.angle += step * 0.32 * orbit.current.speed;
+    SLUGS.forEach((slug, i) => {
+      const group = objects.current[slug];
+      if (!group) return;
+      const a = orbit.current.angle + (i * Math.PI * 2) / 3;
+      const rx = (wide ? PORTRAIT_WIDTH * 0.6 : PORTRAIT_WIDTH * 0.5) * fit + scroll * 1.2;
+      // The ring is tilted: objects cross in front at chest height and behind at head height,
+      // so they never sit on top of the face.
+      group.position.set(centerX + Math.cos(a) * rx, centerY - Math.sin(a) * height * fit * 0.2, Math.sin(a) * 1.7 * fit + 0.5);
+      const target = (hovered === slug ? 0.52 : 0.42) * fit;
+      scales.current[slug] += (target - scales.current[slug]) * ease(10);
+      group.scale.setScalar(scales.current[slug]);
+
+      const label = labels.current[slug];
+      if (label) {
+        scratch.point.copy(group.position);
+        scratch.point.y -= 1.55 * scales.current[slug];
+        scratch.point.project(camera);
+        label.style.transform = `translate(${((scratch.point.x * 0.5 + 0.5) * size.width).toFixed(1)}px, ${((-scratch.point.y * 0.5 + 0.5) * size.height).toFixed(1)}px) translate(-50%, 0)`;
+      }
     });
   });
-  return <group ref={group}>{children}</group>;
+
+  return (
+    <>
+      <group ref={figure} position={[centerX, centerY, 0]} scale={fit}>
+        {portrait && (
+          <>
+            <points geometry={portrait.geometry} frustumCulled={false}>
+              <shaderMaterial ref={material} vertexShader={POINT_VERTEX} fragmentShader={POINT_FRAGMENT} uniforms={uniforms} />
+            </points>
+            {/* An unseen sheet over the portrait, so selecting it is cheap to detect. */}
+            <mesh
+              position={[0, 0, 0.5]}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!still) burst.current = 1;
+              }}
+            >
+              <planeGeometry args={[PORTRAIT_WIDTH * 0.8, portrait.height * 0.92]} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+            </mesh>
+          </>
+        )}
+      </group>
+
+      {SLUGS.map((slug) => (
+        <group
+          key={slug}
+          ref={(g) => {
+            objects.current[slug] = g;
+          }}
+          onPointerOver={(e) => {
+            e.stopPropagation();
+            onHover(slug);
+          }}
+          onPointerOut={() => onHover(null)}
+          onClick={(e) => {
+            e.stopPropagation();
+            goTo(slug);
+          }}
+        >
+          {slug === "repoverse" && <Orbits still={still} />}
+          {slug === "hivemind" && <Honeycomb still={still} />}
+          {slug === "voxui" && <Blob still={still} />}
+        </group>
+      ))}
+    </>
+  );
 }
 
 export default function HeroScene({ still }: { still: boolean }) {
   const [hovered, setHovered] = useState<Slug | null>(null);
   const labels = useRef<Record<Slug, HTMLElement | null>>({ repoverse: null, hivemind: null, voxui: null });
-  const shared = { still, hovered, onHover: setHovered };
 
   return (
     <div className="scene" style={{ cursor: hovered ? "pointer" : "default" }}>
@@ -261,20 +469,10 @@ export default function HeroScene({ still }: { still: boolean }) {
         <ambientLight intensity={1.6} />
         <directionalLight position={[4, 6, 5]} intensity={2.2} />
         <directionalLight position={[-5, -2, 2]} intensity={0.5} color="#BFC8FF" />
-        <Stage still={still} labels={labels}>
-          <Floating slug="repoverse" {...shared}>
-            <Orbits still={still} />
-          </Floating>
-          <Floating slug="hivemind" {...shared}>
-            <Honeycomb still={still} />
-          </Floating>
-          <Floating slug="voxui" {...shared}>
-            <Blob still={still} />
-          </Floating>
-        </Stage>
+        <Scene still={still} hovered={hovered} onHover={setHovered} labels={labels} />
       </Canvas>
       <div className="scene-labels">
-        {(Object.keys(NAMES) as Slug[]).map((slug) => (
+        {SLUGS.map((slug) => (
           <a
             key={slug}
             href={`#${slug}`}

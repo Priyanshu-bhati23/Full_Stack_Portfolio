@@ -59,6 +59,7 @@ h2 {
 .nav-name {
   font-weight: 750;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .nav nav {
@@ -89,16 +90,28 @@ h2 {
 /* Hero */
 .hero {
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  display: flex;
   align-items: center;
   min-height: 100svh;
-  padding: 96px var(--gutter) 40px;
+  padding: 96px var(--gutter) 56px;
+  overflow: hidden;
+}
+
+/* The 3D scene fills the hero. The text sits on top and lets the pointer through. */
+.hero-scene {
+  position: absolute;
+  inset: 0;
 }
 
 .hero-copy {
   position: relative;
   z-index: 2;
+  width: min(52%, 760px);
+  pointer-events: none;
+}
+
+.hero-copy a {
+  pointer-events: auto;
 }
 
 .hero-role {
@@ -109,7 +122,7 @@ h2 {
 
 .hero h1 {
   margin: 0 0 26px;
-  font-size: clamp(54px, 8.6vw, 148px);
+  font-size: clamp(54px, 7.6vw, 132px);
   animation: rise 0.9s cubic-bezier(0.16, 0.8, 0.2, 1) both;
 }
 
@@ -156,13 +169,6 @@ h2 {
   box-shadow: inset 0 0 0 2px currentColor;
 }
 
-.hero-scene {
-  position: relative;
-  align-self: stretch;
-  min-height: 420px;
-  margin-right: calc(var(--gutter) * -1);
-}
-
 .scene {
   position: absolute;
   inset: 0;
@@ -197,9 +203,11 @@ h2 {
 
 .hero-hint {
   position: absolute;
-  right: var(--gutter);
-  bottom: -8px;
+  z-index: 2;
+  left: var(--gutter);
+  bottom: 20px;
   margin: 0;
+  pointer-events: none;
   font-size: 14px;
   color: var(--muted);
 }
@@ -320,6 +328,13 @@ h2 {
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.32), 0 0 0 1px var(--rule);
 }
 
+.tilt {
+  transform: perspective(1400px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transform-origin: 30% 50%;
+  transition: transform 0.25s ease-out;
+  will-change: transform;
+}
+
 .panel-shot img {
   display: block;
   width: 100%;
@@ -364,6 +379,35 @@ h2 {
   max-width: 52ch;
   margin: 0 0 16px;
   font-size: 19px;
+}
+
+.earlier {
+  margin-top: 34px;
+}
+
+.earlier h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.earlier p {
+  padding: 14px 0;
+  margin: 0;
+  border-top: 1px solid var(--line);
+  font-size: 16.5px;
+  color: #33364a;
+}
+
+.earlier a {
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration-color: var(--violet);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
 }
 
 .skills {
@@ -489,21 +533,29 @@ h2 {
 
 @media (max-width: 1000px) {
   .hero {
-    grid-template-columns: 1fr;
-    align-content: start;
+    flex-direction: column;
+    align-items: stretch;
     min-height: 0;
-    padding-top: 110px;
+    padding: 110px 0 0;
+  }
+
+  .hero-copy {
+    width: auto;
+    padding: 0 var(--gutter);
   }
 
   .hero-scene {
-    height: 360px;
-    min-height: 0;
-    margin: 12px calc(var(--gutter) * -1) 0;
+    order: 2;
+    position: relative;
+    inset: auto;
+    height: 470px;
+    margin-top: 8px;
   }
 
   .hero-hint {
+    order: 3;
     position: static;
-    padding: 0 var(--gutter);
+    padding: 0 var(--gutter) 24px;
     text-align: center;
   }
 
@@ -530,8 +582,22 @@ h2 {
 }
 
 @media (max-width: 520px) {
+  .nav {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .nav nav {
+    gap: 12px;
+  }
+
   .nav nav a:not(.nav-cta) {
-    font-size: 14.5px;
+    font-size: 14px;
+  }
+
+  .nav .nav-cta {
+    padding: 6px 12px;
+    font-size: 14px;
   }
 }
 

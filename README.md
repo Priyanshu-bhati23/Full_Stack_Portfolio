@@ -1,21 +1,23 @@
 # Portfolio
 
-A personal portfolio site with a 3D hero. Each object in the hero stands for one project: select it to jump to that project.
+A personal portfolio site with an interactive 3D hero: a portrait made of about 30,000 particles that fly in, move away from the pointer and burst when selected, with three objects circling it, one per project. Select an object to jump to that project.
 
 ## Make it yours
 
-Everything personal is in **`data/profile.ts`**: your name, links, about text, skills, experience, education, and each project's live and source links. Values marked `TODO` are placeholders. Empty strings and empty lists hide the part of the page that uses them, so nothing half-filled is shown.
+Everything personal is in **`data/profile.ts`**: name, links, about text, skills, leadership, education, earlier projects, and each project's live and source links. Empty strings and empty lists hide the part of the page that uses them.
 
-To add your resume, save it as `public/resume.pdf` and set `resume: "/resume.pdf"` in `data/profile.ts`. A Resume button then appears in the navigation.
-
-To replace a project screenshot, overwrite the image in `public/shots/` (2400 by 1500 pixels works best).
+- **Live links**: paste each app's Vercel address into its `live` field and an "Open the live app" button appears.
+- **Portrait**: the hero builds its particle portrait from `public/me.png`, a cut-out photo with a transparent background. Replace that file to change it.
+- **Resume**: the Resume button downloads `public/resume.pdf`. Its source is `resume/resume.html`. To rebuild the PDF after an edit, run `node resume/build.mjs public/resume.pdf "<path to Chrome>"` (needs `npm i -D puppeteer-core` once).
+- **Screenshots**: overwrite the images in `public/shots/` (2400 by 1500 pixels works best).
 
 ## How it is built
 
 | Part | Where |
 | --- | --- |
 | Page content and sections | `app/page.tsx` |
-| 3D hero (orbit model, honeycomb, shader orb) | `components/HeroScene.tsx` |
+| 3D hero (particle portrait, orbit model, honeycomb, shader orb) | `components/HeroScene.tsx` |
+| Pointer tilt on the project screenshots | `components/Tilt.tsx` |
 | Styles, including the stacking project panels | `app/globals.css` |
 
 Stack: Next.js (App Router), TypeScript, React Three Fiber, three.js, GLSL. The site is static: it needs no environment variables.
