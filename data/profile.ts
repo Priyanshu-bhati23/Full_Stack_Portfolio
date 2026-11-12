@@ -5,14 +5,14 @@
  */
 
 export const profile = {
-  name: "Your Name", // TODO
+  name: "Priyanshu Bhati",
   role: "Full-stack developer",
   /** The large line at the top of the page. */
   headline: "I build AI products you can watch working.",
   intro: "Full-stack and frontend developer, looking for an internship. Below are three AI apps I designed, built and deployed end to end.", // TODO: adjust
   location: "", // TODO: for example "Pune, India"
   email: "", // TODO
-  github: "", // TODO: full link, for example https://github.com/your-username
+  github: "https://github.com/Priyanshu-bhati23",
   linkedin: "", // TODO: full link
   /** Put your resume at public/resume.pdf, then set this to "/resume.pdf". */
   resume: "",
@@ -67,7 +67,7 @@ export const projects: Project[] = [
     ],
     stack: ["Next.js", "TypeScript", "React Three Fiber", "Groq", "GitHub API"],
     live: "", // TODO
-    source: "", // TODO
+    source: "https://github.com/Priyanshu-bhati23/Repoverse",
     shot: "/shots/repoverse.webp",
     shotAlt: "Repoverse showing its own source code as a star chart, with folders as large stars and files orbiting them.",
   },
@@ -84,7 +84,7 @@ export const projects: Project[] = [
     ],
     stack: ["Next.js", "TypeScript", "React Three Fiber", "Groq", "Tool calling"],
     live: "", // TODO
-    source: "", // TODO
+    source: "", // TODO: add once Hivemind has a repo
     shot: "/shots/hivemind.webp",
     shotAlt: "Hivemind during its scripted demo: two agent cells raised on a honeycomb board, with their tool calls listed in a log.",
   },
@@ -101,7 +101,7 @@ export const projects: Project[] = [
     ],
     stack: ["Next.js", "TypeScript", "GLSL", "Web Audio", "Groq Whisper"],
     live: "", // TODO
-    source: "", // TODO
+    source: "https://github.com/Priyanshu-bhati23/VoxUI",
     shot: "/shots/voxui.webp",
     shotAlt: "VoxUI with its bundled sample, a focus timer, open in the preview window beside the voice orb.",
   },
