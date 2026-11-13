@@ -11,7 +11,7 @@ export const profile = {
   /** The large line at the top of the page. */
   headline: "I build AI products you can watch working.",
   intro:
-    "Full-stack developer and B.Tech student at IIIT Nagpur, looking for a full-stack or frontend internship. Below are three AI apps I designed, built and deployed end to end.",
+    "Full-stack developer and B.Tech student at IIIT Nagpur. I built a company CRM at T&A IT Consulting, and below are three AI apps I designed, built and deployed end to end.",
   location: "Kota, Rajasthan, India",
   email: "priyanshubhati.dev@gmail.com",
   github: "https://github.com/Priyanshu-bhati23",
@@ -29,14 +29,25 @@ export const profile = {
   skills: [
     { group: "Languages", items: ["TypeScript", "JavaScript", "Python", "C++", "Java", "HTML", "CSS", "GLSL"] },
     { group: "Frontend", items: ["React", "Next.js", "React Three Fiber", "three.js", "Responsive design", "Accessibility"] },
-    { group: "Backend", items: ["Node.js", "REST and streaming APIs", "Flask", "FastAPI", "PostgreSQL", "MySQL", "MongoDB"] },
+    { group: "Backend", items: ["Node.js", "Express", "REST and streaming APIs", "Auth and RBAC", "Flask", "FastAPI", "PostgreSQL", "MySQL", "MongoDB"] },
     { group: "AI", items: ["LLM tool calling", "Structured outputs", "RAG", "LangChain", "LangGraph", "Speech to text"] },
     { group: "Tools", items: ["Git", "GitHub Actions", "Vercel", "MLflow", "DVC"] },
   ],
 
-  /** Heading for the list below. */
-  experienceTitle: "Leadership",
   experience: [
+    {
+      role: "Full-Stack Developer",
+      org: "T&A IT Consulting Services",
+      period: "Jul 2026 to Oct 2026",
+      points: [
+        "Built the company's CRM as a full-stack web app: React and Next.js front end, Node.js and Express REST API, SQL database.",
+        "Implemented authentication and role-based access, so admins and staff only see and change what their role allows.",
+        "Integrated third-party APIs and set up deployment with a CI/CD pipeline.",
+      ],
+    },
+  ] as Array<{ role: string; org: string; period: string; points: string[] }>,
+
+  leadership: [
     { role: "Core Member", org: "E-Cell, IIIT Nagpur", period: "Oct 2024 to Aug 2026", points: [] },
     { role: "Public Relations Team Lead", org: "E-Summit, IIIT Nagpur", period: "Feb 2026", points: [] },
   ] as Array<{ role: string; org: string; period: string; points: string[] }>,

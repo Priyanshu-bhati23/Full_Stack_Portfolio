@@ -4,24 +4,26 @@
 <meta charset="utf-8">
 <title>Priyanshu Bhati, Resume</title>
 <style>
-  @page { size: A4; margin: 10mm 13mm 9mm; }
+  @page { size: A4; margin: 9mm 12mm 8mm; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Liberation Sans", Arial, Helvetica, sans-serif; font-size: 9pt; line-height: 1.32; color: #15171c; }
+  body { margin: 0; font-family: "Liberation Sans", Arial, Helvetica, sans-serif; font-size: 8.9pt; line-height: 1.3; color: #15171c; }
   a { color: #1d3fbf; text-decoration: none; }
   h1 { margin: 0; font-size: 21pt; font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; }
   .role { margin: 2pt 0 4pt; font-size: 10.5pt; font-weight: 600; color: #3a3f4d; }
   .contact { margin: 0; color: #3a3f4d; }
   .contact span + span::before { content: "|"; margin: 0 6pt; color: #9aa0ad; }
-  h2 { margin: 7.5pt 0 3.5pt; padding-bottom: 2pt; border-bottom: 0.8pt solid #15171c; font-size: 9.2pt; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+  h2 { margin: 6.5pt 0 3pt; padding-bottom: 2pt; border-bottom: 0.8pt solid #15171c; font-size: 9.2pt; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
   p { margin: 0; }
   .skills { display: grid; grid-template-columns: 62pt 1fr; gap: 1.6pt 8pt; }
   .skills b { font-weight: 700; }
-  .item { margin-top: 4.5pt; }
+  .item { margin-top: 4pt; }
   .item:first-of-type { margin-top: 0; }
   .head { display: flex; justify-content: space-between; gap: 10pt; align-items: baseline; }
   .head b { font-size: 9.6pt; font-weight: 700; }
   .head i { font-style: normal; color: #4a4f5e; }
   .head .right { white-space: nowrap; color: #3a3f4d; }
+  .links { margin: 0.5pt 0 0; font-size: 8.6pt; }
+  .links span { margin: 0 5pt; color: #9aa0ad; }
   ul { margin: 1.5pt 0 0; padding-left: 12pt; }
   li { margin: 0 0 1pt; padding-left: 1pt; }
 </style>
@@ -35,36 +37,48 @@
 </p>
 
 <h2>Summary</h2>
-<p>B.Tech student at IIIT Nagpur (2027) who builds and ships AI web apps end to end. Works across the stack: interactive 3D and streaming front ends in React and Next.js, typed API routes in Node.js, and LLM agent back ends. Looking for a full-stack or frontend internship.</p>
+<p>Full-stack developer and B.Tech student at IIIT Nagpur (2027) with 4 months of industry experience building a company CRM in React, Next.js, Node.js and SQL. Ships AI web apps end to end: interactive 3D and streaming front ends, typed APIs, and LLM agent back ends. Looking for a full-stack or frontend internship.</p>
 
 <h2>Skills</h2>
 <div class="skills">
   <b>Languages</b><span>TypeScript, JavaScript, Python, C++, Java, HTML, CSS, GLSL</span>
   <b>Frontend</b><span>React, Next.js (App Router), React Three Fiber, three.js, responsive and accessible UI</span>
-  <b>Backend</b><span>Node.js, REST and streaming APIs, Flask, FastAPI, PostgreSQL, MySQL, MongoDB</span>
+  <b>Backend</b><span>Node.js, Express, REST and streaming APIs, authentication and RBAC, Flask, FastAPI, PostgreSQL, MySQL, MongoDB</span>
   <b>AI</b><span>LLM APIs (Groq), tool calling, structured outputs, RAG, LangChain, LangGraph, Whisper speech-to-text</span>
-  <b>Tools</b><span>Git, GitHub Actions, Vercel, MLflow, DVC, Apache Airflow</span>
+  <b>Tools</b><span>Git, GitHub Actions (CI/CD), Vercel, MLflow, DVC, Apache Airflow</span>
+</div>
+
+<h2>Experience</h2>
+<div class="item">
+  <div class="head"><span><b>Full-Stack Developer</b> <i>T&amp;A IT Consulting Services</i></span><span class="right">Jul 2026 – Oct 2026</span></div>
+  <ul>
+    <li>Built the company&rsquo;s CRM as a full-stack web application, with a React and Next.js front end, a Node.js and Express REST API, and a SQL database.</li>
+    <li>Implemented authentication and role-based access control, so admins and staff can see and change only the records their role allows.</li>
+    <li>Integrated third-party APIs into the CRM&rsquo;s workflows, and set up deployment with a CI/CD pipeline so changes ship automatically.</li>
+  </ul>
 </div>
 
 <h2>Projects</h2>
 <div class="item">
-  <div class="head"><span><b>Repoverse</b> <i>3D codebase explorer. Next.js, TypeScript, React Three Fiber, Groq</i></span><span class="right"><a href="https://repoverse-phi.vercel.app/">Live</a> | <a href="https://github.com/Priyanshu-bhati23/Repoverse">Code</a></span></div>
+  <div class="head"><span><b>Repoverse</b> <i>3D codebase explorer. Next.js, TypeScript, React Three Fiber, Groq</i></span></div>
+  <p class="links"><a href="https://repoverse-phi.vercel.app/">repoverse-phi.vercel.app</a><span>|</span><a href="https://github.com/Priyanshu-bhati23/Repoverse">github.com/Priyanshu-bhati23/Repoverse</a></p>
   <ul>
-    <li>Built a web app that turns any GitHub repository into an interactive 3D star chart and explains each file with a streamed LLM response.</li>
+    <li>Turns any GitHub repository into an interactive 3D star chart and explains each file with a streamed LLM response.</li>
     <li>Wrote a deterministic 3D layout algorithm for folder trees and rendered up to 1,200 files with instanced meshes in a handful of draw calls.</li>
     <li>Implemented retrieval without a vector database: a fast model picks files from the tree, the server fetches them, and a larger model answers with file references.</li>
   </ul>
 </div>
 <div class="item">
-  <div class="head"><span><b>Hivemind</b> <i>Multi-agent orchestration with a live 3D trace. Next.js, TypeScript, Groq tool calling</i></span><span class="right"><a href="https://hivemind-7zwb.vercel.app/">Live</a> | <a href="https://github.com/Priyanshu-bhati23/Hivemind">Code</a></span></div>
+  <div class="head"><span><b>Hivemind</b> <i>Multi-agent orchestration with a live 3D trace. Next.js, TypeScript, Groq tool calling</i></span></div>
+  <p class="links"><a href="https://hivemind-7zwb.vercel.app/">hivemind-7zwb.vercel.app</a><span>|</span><a href="https://github.com/Priyanshu-bhati23/Hivemind">github.com/Priyanshu-bhati23/Hivemind</a></p>
   <ul>
     <li>Built an orchestrator that plans a goal into a task graph with structured outputs, then runs up to six of eleven specialist agents in parallel with dependencies.</li>
     <li>Implemented a tool-calling loop (Wikipedia lookups and a hand-written expression parser, so model output is never executed as code) and validated every plan before running it.</li>
-    <li>Streamed each step as newline-delimited JSON; one reducer drives both the run log and a 3D honeycomb visualisation.</li>
-  </ul>
+      </ul>
 </div>
 <div class="item">
-  <div class="head"><span><b>VoxUI</b> <i>Voice-to-interface generator. Next.js, TypeScript, GLSL, Web Audio, Whisper</i></span><span class="right"><a href="https://vox-ui-wheat.vercel.app/">Live</a> | <a href="https://github.com/Priyanshu-bhati23/VoxUI">Code</a></span></div>
+  <div class="head"><span><b>VoxUI</b> <i>Voice-to-interface generator. Next.js, TypeScript, GLSL, Web Audio, Whisper</i></span></div>
+  <p class="links"><a href="https://vox-ui-wheat.vercel.app/">vox-ui-wheat.vercel.app</a><span>|</span><a href="https://github.com/Priyanshu-bhati23/VoxUI">github.com/Priyanshu-bhati23/VoxUI</a></p>
   <ul>
     <li>Built a voice-driven tool: speech is transcribed with Whisper, a complete HTML interface streams into a live preview, and it can be refined by voice.</li>
     <li>Ran untrusted generated code safely in a sandboxed iframe behind a strict Content-Security-Policy, enabling scripts only after the stream completes.</li>
@@ -72,16 +86,15 @@
   </ul>
 </div>
 <div class="item">
-  <div class="head"><span><b>Auto Angular Component Generator</b> <i>LangChain, LangGraph, Vercel</i></span><span class="right"><a href="https://agentic-component-architect-qi0s1kosn.vercel.app/">Live</a></span></div>
+  <div class="head"><span><b>Auto Angular Component Generator</b> <i>LangChain, LangGraph, Vercel</i></span><span class="right"><a href="https://agentic-component-architect-qi0s1kosn.vercel.app/">Live demo</a></span></div>
   <ul>
-    <li>Built an agentic system that generates Angular components (TypeScript, HTML templates, SCSS) from natural-language descriptions, using multi-step planning in LangGraph.</li>
-    <li>Added validation and self-correction loops to improve output quality, and deployed it as a full-stack web app on Vercel with streaming inference.</li>
+    <li>Agentic system that writes Angular components (TypeScript, HTML, SCSS) from plain-language descriptions, with LangGraph planning, validation and self-correction loops; deployed on Vercel with streaming.</li>
   </ul>
 </div>
 <div class="item">
-  <div class="head"><span><b>Multimodal AI Doctor Assistant</b> <i>Whisper, LLM, Gradio</i></span><span class="right"><a href="https://huggingface.co/spaces/fallguy23/AIMedhatBot">Live</a></span></div>
+  <div class="head"><span><b>Multimodal AI Doctor Assistant</b> <i>Whisper, LLM, Gradio</i></span><span class="right"><a href="https://huggingface.co/spaces/fallguy23/AIMedhatBot">Live demo</a></span></div>
   <ul>
-    <li>Built a voice, vision and text assistant with speech-to-text and text-to-speech pipelines, deployed through API-backed Gradio interfaces.</li>
+    <li>Voice, vision and text assistant with speech-to-text and text-to-speech pipelines, served through a Gradio interface.</li>
   </ul>
 </div>
 
@@ -91,10 +104,8 @@
 
 <h2>Achievements and Leadership</h2>
 <ul>
-  <li>Solved 200+ problems on LeetCode.</li>
-  <li>Finalist, CEO Event, VNIT Nagpur.</li>
+  <li>Solved 200+ problems on LeetCode. Finalist, CEO Event, VNIT Nagpur.</li>
   <li>Core Member, E-Cell, IIIT Nagpur (Oct 2024 – Aug 2026). Public Relations Team Lead, E-Summit, IIIT Nagpur (Feb 2026).</li>
-  <li>Team Head for the DIP project, leading experimentation and technical execution.</li>
 </ul>
 </body>
 </html>

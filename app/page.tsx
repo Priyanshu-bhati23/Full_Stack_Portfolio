@@ -125,12 +125,16 @@ export default function Home() {
           </dl>
         </section>
 
-        {(profile.experience.length > 0 || profile.education.length > 0) && (
-          <section className="history">
-            {profile.experience.length > 0 && (
-              <div>
-                <h2>{profile.experienceTitle}</h2>
-                {profile.experience.map((job) => (
+        <section className="history">
+          {[
+            { title: "Experience", items: profile.experience },
+            { title: "Leadership", items: profile.leadership },
+          ]
+            .filter((group) => group.items.length > 0)
+            .map((group) => (
+              <div key={group.title}>
+                <h2>{group.title}</h2>
+                {group.items.map((job) => (
                   <div className="entry" key={job.role + job.org}>
                     <p className="entry-period">{job.period}</p>
                     <div>
@@ -148,26 +152,25 @@ export default function Home() {
                   </div>
                 ))}
               </div>
-            )}
-            {profile.education.length > 0 && (
-              <div>
-                <h2>Education</h2>
-                {profile.education.map((school) => (
-                  <div className="entry" key={school.degree + school.school}>
-                    <p className="entry-period">{school.period}</p>
-                    <div>
-                      <h3>{school.degree}</h3>
-                      <p>
-                        {school.school}
-                        {school.detail && `, ${school.detail}`}
-                      </p>
-                    </div>
+            ))}
+          {profile.education.length > 0 && (
+            <div>
+              <h2>Education</h2>
+              {profile.education.map((school) => (
+                <div className="entry" key={school.degree + school.school}>
+                  <p className="entry-period">{school.period}</p>
+                  <div>
+                    <h3>{school.degree}</h3>
+                    <p>
+                      {school.school}
+                      {school.detail && `, ${school.detail}`}
+                    </p>
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         <section id="contact" className="contact">
           <h2>Looking for an intern who ships? Let&apos;s talk.</h2>
