@@ -1,20 +1,17 @@
 "use client";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useMemo, useRef, useState, type RefObject } from "react";
 import * as THREE from "three";
 
 /**
- * The hero scene.
+ * The hero scene: an animated 3D character with the three projects floating
+ * around it.
  *
- * In the middle is a portrait built from tens of thousands of particles, one
- * per sampled pixel of a photo, each pushed forward or back to give the face
- * depth. The particles fly in on load, move away from the pointer, burst when
- * the portrait is selected and drift apart as the page scrolls.
- *
- * Three objects orbit the portrait, one per project: an orbit model for
- * Repoverse, a honeycomb for Hivemind and a noise-displaced orb for VoxUI.
- * Hover one to stop the orbit, select it to jump to its project.
+ * The character is built from simple shapes (no model file), so it loads
+ * instantly. It looks toward the pointer, blinks, breathes, waves when the page
+ * opens or when it is selected, and turns to face whichever project the pointer
+ * is over. Each project object leads to that project when selected.
  */
 
 type Slug = "repoverse" | "hivemind" | "voxui";
@@ -22,8 +19,15 @@ type Slug = "repoverse" | "hivemind" | "voxui";
 const SLUGS: Slug[] = ["repoverse", "hivemind", "voxui"];
 const NAMES: Record<Slug, string> = { repoverse: "Repoverse", hivemind: "Hivemind", voxui: "VoxUI" };
 
-/** Portrait size in world units before fitting to the screen. */
-const PORTRAIT_WIDTH = 3.7;
+/** Where each project floats, relative to the character, in character-height units. */
+const SPOTS: Record<Slug, [number, number, number]> = {
+  repoverse: [-1.75, 0.55, 0.4],
+  voxui: [1.75, 1.2, 0.1],
+  hivemind: [1.5, -0.8, 0.6],
+};
+
+/** Character height in world units before fitting to the screen. */
+const CHARACTER_HEIGHT = 3.4;
 
 function goTo(slug: Slug) {
   document.getElementById(slug)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -184,126 +188,241 @@ function Blob({ still }: { still: boolean }) {
   );
 }
 
-interface Portrait {
-  geometry: THREE.BufferGeometry;
-  height: number;
+
+const SKIN = "#d6a07c";
+const SKIN_SHADE = "#c48a66";
+const HAIR = "#1b1513";
+const JACKET = "#c9a37b";
+const JACKET_SHADE = "#b48d65";
+const SHIRT = "#4b1d2c";
+
+/** One arm: a shoulder joint, an upper arm, an elbow joint, a forearm and a hand. */
+function Arm({ side, shoulder, elbow }: { side: 1 | -1; shoulder: RefObject<THREE.Group | null>; elbow: RefObject<THREE.Group | null> }) {
+  return (
+    <group ref={shoulder} position={[side * 0.74, -0.42, 0]}>
+      <mesh position={[0, -0.36, 0]}>
+        <capsuleGeometry args={[0.17, 0.5, 6, 14]} />
+        <meshStandardMaterial color={JACKET} roughness={0.8} />
+      </mesh>
+      <group ref={elbow} position={[0, -0.72, 0]}>
+        <mesh position={[0, -0.32, 0]}>
+          <capsuleGeometry args={[0.15, 0.44, 6, 14]} />
+          <meshStandardMaterial color={JACKET} roughness={0.8} />
+        </mesh>
+        <mesh position={[0, -0.68, 0.02]}>
+          <sphereGeometry args={[0.14, 18, 14]} />
+          <meshStandardMaterial color={SKIN} roughness={0.6} />
+        </mesh>
+      </group>
+    </group>
+  );
 }
 
-/** Turn a cut-out photo into a cloud of coloured points with a little depth. */
-function usePortrait(src: string): Portrait | null {
-  const [portrait, setPortrait] = useState<Portrait | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const image = new Image();
-    image.onload = () => {
-      if (cancelled) return;
-      const { width: w, height: h } = image;
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      if (!ctx) return;
-      ctx.drawImage(image, 0, 0);
-      const pixels = ctx.getImageData(0, 0, w, h).data;
-
-      // Fewer points on small or low-powered screens.
-      const step = window.innerWidth < 700 ? 3 : 2;
-      const height = (PORTRAIT_WIDTH * h) / w;
-      const positions: number[] = [];
-      const colors: number[] = [];
-      const seeds: number[] = [];
-
-      for (let py = 0; py < h; py += step) {
-        for (let px = 0; px < w; px += step) {
-          const i = (py * w + px) * 4;
-          if (pixels[i + 3] < 110) continue;
-          const u = px / w;
-          const v = py / h;
-          // Thin the points out toward the bottom so the bust fades instead of ending in a line.
-          if (v > 0.78 && Math.random() < ((v - 0.78) / 0.22) * 0.9) continue;
-
-          const r = pixels[i] / 255;
-          const g = pixels[i + 1] / 255;
-          const b = pixels[i + 2] / 255;
-          const light = (r + g + b) / 3;
-
-          // Depth is estimated, not measured: a dome for the head, a wider one for
-          // the shoulders, and brighter pixels a touch closer.
-          const hx = (u - 0.44) / 0.3;
-          const hy = (v - 0.32) / 0.34;
-          const head = Math.sqrt(Math.max(0, 1 - hx * hx - hy * hy));
-          const bx = (u - 0.5) / 0.62;
-          const by = (v - 1) / 0.5;
-          const body = Math.sqrt(Math.max(0, 1 - bx * bx - by * by));
-          const depth = head * 0.8 + body * 0.45 + (light - 0.4) * 0.25;
-
-          positions.push((u - 0.5) * PORTRAIT_WIDTH, (0.5 - v) * height, depth);
-          colors.push(r, g, b);
-          seeds.push(Math.random(), Math.random(), Math.random(), Math.random());
-        }
-      }
-
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-      geometry.setAttribute("aColor", new THREE.Float32BufferAttribute(colors, 3));
-      geometry.setAttribute("aSeed", new THREE.Float32BufferAttribute(seeds, 4));
-      geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 30);
-      setPortrait({ geometry, height });
-    };
-    image.src = src;
-    return () => {
-      cancelled = true;
-    };
-  }, [src]);
-
-  return portrait;
+interface CharacterProps {
+  still: boolean;
+  /** World position the character should look toward, or null to follow the pointer. */
+  lookAt: RefObject<THREE.Vector3 | null>;
+  /** Raise to start a wave. */
+  wave: RefObject<number>;
+  onSelect: () => void;
 }
 
-const POINT_VERTEX = /* glsl */ `
-attribute vec3 aColor;
-attribute vec4 aSeed;
-uniform float uTime;
-uniform float uAssemble;
-uniform float uScatter;
-uniform float uBurst;
-uniform float uSize;
-uniform float uScale;
-uniform vec3 uPointer;
-uniform float uPush;
-varying vec3 vColor;
-void main(){
-  // Fly in from a random cloud, each point with its own delay.
-  vec3 start = (aSeed.xyz - 0.5) * vec3(11.0, 8.0, 6.0);
-  float k = clamp((uAssemble - aSeed.w * 0.45) / 0.55, 0.0, 1.0);
-  k = k * k * (3.0 - 2.0 * k);
-  vec3 p = mix(start, position, k);
+function Character({ still, lookAt, wave, onSelect }: CharacterProps) {
+  const root = useRef<THREE.Group>(null);
+  const torso = useRef<THREE.Group>(null);
+  const head = useRef<THREE.Group>(null);
+  const eyes = useRef<(THREE.Group | null)[]>([]);
+  const brows = useRef<(THREE.Mesh | null)[]>([]);
+  const rightShoulder = useRef<THREE.Group>(null);
+  const rightElbow = useRef<THREE.Group>(null);
+  const leftShoulder = useRef<THREE.Group>(null);
+  const leftElbow = useRef<THREE.Group>(null);
+  const clock = useRef({ t: 0, nextBlink: 2.2, blink: 0, intro: still ? 1 : 0 });
+  const target = useMemo(() => new THREE.Vector3(), []);
+  const local = useMemo(() => new THREE.Vector3(), []);
 
-  // A slow shimmer keeps the portrait alive.
-  p += 0.014 * vec3(sin(uTime * 1.3 + aSeed.x * 40.0), cos(uTime * 1.1 + aSeed.y * 40.0), sin(uTime * 0.9 + aSeed.z * 40.0));
+  useFrame((state, dt) => {
+    const step = Math.min(dt, 0.05);
+    const c = clock.current;
+    c.t += step;
+    const ease = (rate: number) => 1 - Math.exp(-step * rate);
 
-  // Points move away from the pointer.
-  vec2 away = p.xy - uPointer.xy;
-  float near = (1.0 - smoothstep(0.0, 0.85, length(away))) * uPush;
-  p.xy += normalize(away + 0.0001) * near * 0.5;
-  p.z += near * 0.9 * (aSeed.z - 0.15);
+    // Entrance: rise and grow with a little overshoot.
+    c.intro = Math.min(1, c.intro + step / 1.1);
+    const k = c.intro;
+    const pop = still ? 1 : 1 + Math.sin(k * Math.PI) * 0.06 * (1 - k) - (1 - k) * 0.4;
+    if (root.current) {
+      root.current.scale.setScalar(Math.max(0.01, pop * Math.min(1, k * 1.6)));
+      root.current.position.y = still ? 0 : -(1 - k) * 0.8;
+    }
 
-  // Scrolling, or selecting the portrait, sends them outward.
-  vec3 dir = normalize(aSeed.xyz - 0.5);
-  p += dir * (uScatter * 7.0 * (0.35 + aSeed.w) + uBurst * 2.6 * aSeed.w);
+    // Breathing.
+    if (torso.current && !still) torso.current.scale.set(1, 1 + Math.sin(c.t * 1.8) * 0.012, 1 + Math.sin(c.t * 1.8) * 0.02);
 
-  vec4 mv = modelViewMatrix * vec4(p, 1.0);
-  gl_Position = projectionMatrix * mv;
-  gl_PointSize = uSize * uScale / -mv.z * (1.0 + near * 0.8);
-  vColor = aColor;
-}`;
+    // Where to look: a hovered project, or the pointer.
+    if (lookAt.current) target.copy(lookAt.current);
+    else target.set(state.pointer.x * state.viewport.width * 0.5, state.pointer.y * state.viewport.height * 0.5, 6);
+    if (head.current && root.current) {
+      local.copy(target);
+      root.current.worldToLocal(local);
+      local.y -= 0.55;
+      const yaw = THREE.MathUtils.clamp(Math.atan2(local.x, Math.max(0.5, local.z)), -0.75, 0.75);
+      const pitch = THREE.MathUtils.clamp(-Math.atan2(local.y, Math.max(0.5, Math.hypot(local.x, local.z))), -0.35, 0.4);
+      const r = still ? 1 : ease(5);
+      head.current.rotation.y += (yaw - head.current.rotation.y) * r;
+      head.current.rotation.x += (pitch - head.current.rotation.x) * r;
+      head.current.rotation.z = still ? 0 : Math.sin(c.t * 0.7) * 0.03;
+      if (torso.current) torso.current.rotation.y += (yaw * 0.35 - torso.current.rotation.y) * r;
+    }
 
-const POINT_FRAGMENT = /* glsl */ `
-varying vec3 vColor;
-void main(){
-  if (length(gl_PointCoord - 0.5) > 0.5) discard;
-  gl_FragColor = vec4(vColor, 1.0);
-}`;
+    // Blinking.
+    if (!still && c.t > c.nextBlink) {
+      c.blink = 1;
+      c.nextBlink = c.t + 2.5 + Math.random() * 3;
+    }
+    c.blink = Math.max(0, c.blink - step * 7);
+    const lid = c.blink > 0.5 ? (1 - c.blink) * 2 : c.blink * 2;
+    eyes.current.forEach((eye) => eye?.scale.set(1, Math.max(0.08, 1 - lid), 1));
+
+    // Eyebrows lift while waving or looking at a project.
+    const lift = wave.current > 0 || lookAt.current ? 0.05 : 0;
+    brows.current.forEach((b) => {
+      if (b) b.position.y += (0.2 + lift - b.position.y) * ease(8);
+    });
+
+    // Waving with the right arm, then back to rest.
+    if (!still) wave.current = Math.max(0, wave.current - step / 2.2);
+    const w = wave.current;
+    const up = w > 0 ? Math.min(1, Math.min(w, 1 - w) * 6 + (w > 0.15 && w < 0.85 ? 1 : 0)) : 0;
+    if (rightShoulder.current && rightElbow.current) {
+      const raise = up * 2.5;
+      rightShoulder.current.rotation.z += (raise - rightShoulder.current.rotation.z) * ease(9);
+      rightShoulder.current.rotation.x += (-up * 0.2 - rightShoulder.current.rotation.x) * ease(9);
+      const swing = up * (0.55 + Math.sin(c.t * 11) * 0.45);
+      rightElbow.current.rotation.z += (swing - rightElbow.current.rotation.z) * ease(14);
+    }
+    if (leftShoulder.current && leftElbow.current && !still) {
+      leftShoulder.current.rotation.z = -0.08 - Math.sin(c.t * 1.8) * 0.02;
+      leftElbow.current.rotation.z = -0.12;
+    }
+  });
+
+  return (
+    <group
+      ref={root}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect();
+      }}
+    >
+      <group ref={torso}>
+        {/* Jacket body */}
+        <mesh position={[0, -0.95, 0]} scale={[1.18, 1, 0.78]}>
+          <capsuleGeometry args={[0.6, 0.75, 8, 24]} />
+          <meshStandardMaterial color={JACKET} roughness={0.85} />
+        </mesh>
+        {/* Zip */}
+        <mesh position={[0, -0.95, 0.47]}>
+          <boxGeometry args={[0.04, 1.1, 0.02]} />
+          <meshStandardMaterial color={JACKET_SHADE} roughness={0.6} />
+        </mesh>
+        {/* Shirt and collar */}
+        <mesh position={[0, -0.24, 0.06]}>
+          <cylinderGeometry args={[0.27, 0.34, 0.26, 24]} />
+          <meshStandardMaterial color={SHIRT} roughness={0.7} />
+        </mesh>
+        <mesh position={[0, -0.26, 0.02]} rotation={[Math.PI / 2 - 0.15, 0, 0]}>
+          <torusGeometry args={[0.37, 0.09, 12, 28, Math.PI * 1.7]} />
+          <meshStandardMaterial color={JACKET} roughness={0.85} />
+        </mesh>
+        <Arm side={-1} shoulder={leftShoulder} elbow={leftElbow} />
+        <Arm side={1} shoulder={rightShoulder} elbow={rightElbow} />
+        {/* Neck */}
+        <mesh position={[0, -0.05, 0]}>
+          <cylinderGeometry args={[0.19, 0.22, 0.34, 18]} />
+          <meshStandardMaterial color={SKIN_SHADE} roughness={0.6} />
+        </mesh>
+
+        <group ref={head} position={[0, 0.55, 0]}>
+          {/* Face */}
+          <mesh scale={[0.9, 1.05, 0.95]}>
+            <sphereGeometry args={[0.55, 40, 32]} />
+            <meshStandardMaterial color={SKIN} roughness={0.55} />
+          </mesh>
+          {/* Ears */}
+          {[-1, 1].map((side) => (
+            <mesh key={side} position={[side * 0.49, 0, -0.02]} scale={[0.45, 0.8, 0.5]}>
+              <sphereGeometry args={[0.16, 16, 12]} />
+              <meshStandardMaterial color={SKIN_SHADE} roughness={0.6} />
+            </mesh>
+          ))}
+          {/* Hair: a cap and a swept front */}
+          <mesh position={[0, 0.1, -0.03]} scale={[0.95, 1.02, 1]}>
+            <sphereGeometry args={[0.57, 40, 20, 0, Math.PI * 2, 0, 1.25]} />
+            <meshStandardMaterial color={HAIR} roughness={0.9} side={THREE.DoubleSide} />
+          </mesh>
+          <mesh position={[0.04, 0.46, 0.18]} rotation={[0.35, 0.15, -0.12]} scale={[1, 0.55, 0.8]}>
+            <sphereGeometry args={[0.36, 24, 16]} />
+            <meshStandardMaterial color={HAIR} roughness={0.9} />
+          </mesh>
+          {/* Beard and moustache */}
+          <mesh position={[0, -0.02, 0.01]} scale={[0.93, 1.07, 0.97]}>
+            <sphereGeometry args={[0.555, 40, 24, Math.PI * 0.08, Math.PI * 0.84, 1.98, 0.86]} />
+            <meshStandardMaterial color="#2a1f1b" roughness={0.95} side={THREE.DoubleSide} />
+          </mesh>
+          <mesh position={[0, -0.22, 0.47]} rotation={[0, 0, Math.PI / 2]} scale={[0.6, 1, 0.6]}>
+            <capsuleGeometry args={[0.05, 0.22, 4, 10]} />
+            <meshStandardMaterial color={HAIR} roughness={0.95} />
+          </mesh>
+          {/* Mouth */}
+          <mesh position={[0, -0.32, 0.47]} rotation={[0, 0, Math.PI / 2]}>
+            <capsuleGeometry args={[0.022, 0.12, 4, 8]} />
+            <meshStandardMaterial color="#7a3b33" roughness={0.6} />
+          </mesh>
+          {/* Nose */}
+          <mesh position={[0, -0.06, 0.53]} scale={[0.8, 1.2, 1]}>
+            <sphereGeometry args={[0.075, 16, 12]} />
+            <meshStandardMaterial color={SKIN_SHADE} roughness={0.55} />
+          </mesh>
+          {/* Eyes and brows */}
+          {[-1, 1].map((side, i) => (
+            <group key={side}>
+              <group
+                ref={(g) => {
+                  eyes.current[i] = g;
+                }}
+                position={[side * 0.18, 0.07, 0.46]}
+              >
+                <mesh scale={[1, 0.8, 0.5]}>
+                  <sphereGeometry args={[0.075, 18, 14]} />
+                  <meshStandardMaterial color="#f6f1ea" roughness={0.3} />
+                </mesh>
+                <mesh position={[0, 0, 0.03]}>
+                  <sphereGeometry args={[0.042, 16, 12]} />
+                  <meshStandardMaterial color="#1c1210" roughness={0.2} />
+                </mesh>
+                <mesh position={[0.014, 0.016, 0.06]}>
+                  <sphereGeometry args={[0.011, 8, 6]} />
+                  <meshBasicMaterial color="#ffffff" />
+                </mesh>
+              </group>
+              <mesh
+                ref={(m) => {
+                  brows.current[i] = m;
+                }}
+                position={[side * 0.18, 0.2, 0.47]}
+                rotation={[0, 0, side * -0.12]}
+              >
+                <boxGeometry args={[0.17, 0.04, 0.04]} />
+                <meshStandardMaterial color={HAIR} roughness={0.9} />
+              </mesh>
+            </group>
+          ))}
+        </group>
+      </group>
+    </group>
+  );
+}
 
 interface SceneProps {
   still: boolean;
@@ -313,127 +432,71 @@ interface SceneProps {
 }
 
 function Scene({ still, hovered, onHover, labels }: SceneProps) {
-  const portrait = usePortrait("/me.png");
   const { viewport, size, camera } = useThree();
-  const figure = useRef<THREE.Group>(null);
+  const stage = useRef<THREE.Group>(null);
   const objects = useRef<Record<Slug, THREE.Group | null>>({ repoverse: null, hivemind: null, voxui: null });
-  const scales = useRef<Record<Slug, number>>({ repoverse: 1, hivemind: 1, voxui: 1 });
-  const orbit = useRef({ angle: 0.6, speed: 1 });
-  const burst = useRef(0);
-  const assemble = useRef(still ? 1 : 0);
-  const material = useRef<THREE.ShaderMaterial>(null);
+  const scales = useRef<Record<Slug, number>>({ repoverse: 0.001, hivemind: 0.001, voxui: 0.001 });
+  const lookAt = useRef<THREE.Vector3 | null>(null);
+  const wave = useRef(still ? 0 : 1);
+  const time = useRef(0);
+  const point = useMemo(() => new THREE.Vector3(), []);
+  const world = useMemo(() => new THREE.Vector3(), []);
 
-  const uniforms = useMemo(
-    () => ({
-      uTime: { value: 0 },
-      uAssemble: { value: 0 },
-      uScatter: { value: 0 },
-      uBurst: { value: 0 },
-      uSize: { value: 0.03 },
-      uScale: { value: 1 },
-      uPointer: { value: new THREE.Vector3(99, 99, 0) },
-      uPush: { value: 0 },
-    }),
-    [],
-  );
-
-  const scratch = useMemo(
-    () => ({ ray: new THREE.Raycaster(), plane: new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), hit: new THREE.Vector3(), point: new THREE.Vector3() }),
-    [],
-  );
-
-  // Fit the portrait to the canvas: beside the text on wide screens, centred on narrow ones.
+  // Fit to the canvas: beside the text on wide screens, centred on narrow ones.
   const wide = size.width >= 900;
-  const height = portrait?.height ?? 4.4;
-  const fit = Math.min(1.15, (viewport.height * 0.84) / height, wide ? 9 : (viewport.width * 0.92) / PORTRAIT_WIDTH);
-  const centerX = wide ? viewport.width * 0.235 : 0;
-  const centerY = -viewport.height / 2 + (height * fit) / 2 - 0.05;
+  const fit = Math.min((viewport.height * 0.62) / CHARACTER_HEIGHT, (viewport.width * (wide ? 0.42 : 0.62)) / 4.4);
+  const centerX = wide ? viewport.width * 0.22 : 0;
+  const centerY = wide ? -0.15 * fit : -0.05;
 
   useFrame((state, dt) => {
-    // Write to the material's own uniforms: the renderer keeps its own copy of each one,
-    // so changing the object passed in as a prop would not reach the shader.
-    const u = material.current?.uniforms ?? uniforms;
     const step = Math.min(dt, 0.05);
-    const ease = (rate: number) => 1 - Math.exp(-step * rate);
+    time.current += still ? 0 : step;
+    const t = time.current;
     const scroll = Math.min(window.scrollY / Math.max(window.innerHeight, 1), 1);
-
-    if (!still) u.uTime.value += step;
-    // Real elapsed time, so the fly-in takes about two seconds even when frames are slow.
-    assemble.current = still ? 1 : Math.min(1, assemble.current + Math.min(dt, 0.3) / 2.2);
-    u.uAssemble.value = portrait ? assemble.current : 0;
-    if (!portrait) assemble.current = still ? 1 : 0;
-    u.uScatter.value += ((still ? 0 : scroll) - u.uScatter.value) * ease(4);
-    burst.current *= Math.exp(-step * 2.2);
-    u.uBurst.value = burst.current;
-    u.uScale.value = (size.height * state.viewport.dpr) / (2 * Math.tan(THREE.MathUtils.degToRad(21)));
-    u.uSize.value = (window.innerWidth < 700 ? 0.046 : 0.031) * fit;
-
-    if (figure.current) {
-      // The portrait turns a little toward the pointer.
-      if (!still) {
-        figure.current.rotation.y += (state.pointer.x * 0.32 - figure.current.rotation.y) * ease(3);
-        figure.current.rotation.x += (-state.pointer.y * 0.14 - figure.current.rotation.x) * ease(3);
-      }
-      figure.current.updateMatrixWorld();
-
-      // Where the pointer meets the portrait's plane, in the portrait's own space.
-      scratch.ray.setFromCamera(state.pointer, camera);
-      scratch.plane.constant = -0.4;
-      if (scratch.ray.ray.intersectPlane(scratch.plane, scratch.hit)) {
-        u.uPointer.value.copy(figure.current.worldToLocal(scratch.hit));
-      }
-      const inside = Math.abs(state.pointer.x) < 0.999 && Math.abs(state.pointer.y) < 0.999 && (state.pointer.x !== 0 || state.pointer.y !== 0);
-      u.uPush.value += ((still || !inside ? 0 : 1) - u.uPush.value) * ease(6);
+    if (stage.current) {
+      stage.current.position.set(centerX, centerY - scroll * 1.2, 0);
+      stage.current.rotation.y = still ? 0 : scroll * 0.8;
     }
 
-    // The three project objects circle the portrait, passing in front of it and behind it.
-    orbit.current.speed += ((hovered || still ? 0 : 1) - orbit.current.speed) * ease(5);
-    orbit.current.angle += step * 0.32 * orbit.current.speed;
     SLUGS.forEach((slug, i) => {
       const group = objects.current[slug];
-      if (!group) return;
-      const a = orbit.current.angle + (i * Math.PI * 2) / 3;
-      const rx = (wide ? PORTRAIT_WIDTH * 0.6 : PORTRAIT_WIDTH * 0.5) * fit + scroll * 1.2;
-      // The ring is tilted: objects cross in front at chest height and behind at head height,
-      // so they never sit on top of the face.
-      group.position.set(centerX + Math.cos(a) * rx, centerY - Math.sin(a) * height * fit * 0.2, Math.sin(a) * 1.7 * fit + 0.5);
-      const target = (hovered === slug ? 0.52 : 0.42) * fit;
-      scales.current[slug] += (target - scales.current[slug]) * ease(10);
+      if (!group || !stage.current) return;
+      const [x, y, z] = SPOTS[slug];
+      const delay = 0.6 + i * 0.18;
+      const shown = still || t > delay ? 1 : 0;
+      group.position.set(x, y + (still ? 0 : Math.sin(t * 1.1 + i * 2) * 0.09), z);
+      group.rotation.y = still ? 0.4 : t * (0.35 + i * 0.08);
+      const target = shown * (hovered === slug ? 0.52 : 0.42);
+      scales.current[slug] += (target - scales.current[slug]) * (1 - Math.exp(-step * 7));
       group.scale.setScalar(scales.current[slug]);
+
+      if (hovered === slug) {
+        group.getWorldPosition(world);
+        lookAt.current = (lookAt.current ?? new THREE.Vector3()).copy(world).setZ(world.z + 2);
+      }
 
       const label = labels.current[slug];
       if (label) {
-        scratch.point.copy(group.position);
-        scratch.point.y -= 1.55 * scales.current[slug];
-        scratch.point.project(camera);
-        label.style.transform = `translate(${((scratch.point.x * 0.5 + 0.5) * size.width).toFixed(1)}px, ${((-scratch.point.y * 0.5 + 0.5) * size.height).toFixed(1)}px) translate(-50%, 0)`;
+        group.getWorldPosition(point);
+        point.y -= 0.82 * fit;
+        point.project(camera);
+        label.style.opacity = String(Math.min(1, scales.current[slug] / 0.3));
+        label.style.transform = `translate(${((point.x * 0.5 + 0.5) * size.width).toFixed(1)}px, ${((-point.y * 0.5 + 0.5) * size.height).toFixed(1)}px) translate(-50%, 0)`;
       }
     });
+    if (!hovered) lookAt.current = null;
   });
 
   return (
-    <>
-      <group ref={figure} position={[centerX, centerY, 0]} scale={fit}>
-        {portrait && (
-          <>
-            <points geometry={portrait.geometry} frustumCulled={false}>
-              <shaderMaterial ref={material} vertexShader={POINT_VERTEX} fragmentShader={POINT_FRAGMENT} uniforms={uniforms} />
-            </points>
-            {/* An unseen sheet over the portrait, so selecting it is cheap to detect. */}
-            <mesh
-              position={[0, 0, 0.5]}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!still) burst.current = 1;
-              }}
-            >
-              <planeGeometry args={[PORTRAIT_WIDTH * 0.8, portrait.height * 0.92]} />
-              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-            </mesh>
-          </>
-        )}
-      </group>
-
+    <group ref={stage} scale={fit}>
+      <Character
+        still={still}
+        lookAt={lookAt}
+        wave={wave}
+        onSelect={() => {
+          if (!still) wave.current = 1;
+        }}
+      />
       {SLUGS.map((slug) => (
         <group
           key={slug}
@@ -455,7 +518,7 @@ function Scene({ still, hovered, onHover, labels }: SceneProps) {
           {slug === "voxui" && <Blob still={still} />}
         </group>
       ))}
-    </>
+    </group>
   );
 }
 
@@ -469,6 +532,7 @@ export default function HeroScene({ still }: { still: boolean }) {
         <ambientLight intensity={1.6} />
         <directionalLight position={[4, 6, 5]} intensity={2.2} />
         <directionalLight position={[-5, -2, 2]} intensity={0.5} color="#BFC8FF" />
+        <directionalLight position={[-3, 3, -5]} intensity={1.6} color="#ff8a3d" />
         <Scene still={still} hovered={hovered} onHover={setHovered} labels={labels} />
       </Canvas>
       <div className="scene-labels">

@@ -51,7 +51,7 @@ export default function Home() {
               )}
             </div>
           </div>
-          <p className="hero-hint">Move over the portrait, select it, or pick one of the three objects circling it.</p>
+          <p className="hero-hint">Move your pointer and I follow it. Select me to say hi, or pick one of the three projects.</p>
         </section>
 
         <section id="work" aria-label="Work">
